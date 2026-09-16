@@ -5,7 +5,6 @@ import io
 import json
 import os
 from pathlib import Path
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -145,10 +144,29 @@ class DocumentationTests(unittest.TestCase):
 
     def test_source_mutation_cannot_claim_success_for_original_revision(self):
         calls = []
-        result = self.call(self.run_args('from pathlib import Path; Path("README.md").write_text("changed source")'), lambda body, token: calls.append(dict(body)))
+        args = self.run_args('from pathlib import Path; Path("README.md").write_text("changed source")')
+        args[args.index('--operational-notes') + 1] = '😀' * 2000
+        result = self.call(args, lambda body, token: calls.append(dict(body)))
         self.assertNotEqual(result, 0)
         self.assertEqual(calls[0]['outcome'], 'failure')
         self.assertIn('requires reconciliation', calls[0]['operational_notes'])
+        self.assertLessEqual(len(calls[0]['operational_notes'].encode('utf-16-le')) // 2, 4000)
+
+    def test_new_nonignored_source_cannot_claim_success(self):
+        calls = []
+        code = 'from pathlib import Path; Path("src").mkdir(); Path("src/new.py").write_text("new source")'
+        result = self.call(self.run_args(code), lambda body, token: calls.append(dict(body)))
+        self.assertNotEqual(result, 0)
+        self.assertEqual(calls[0]['outcome'], 'failure')
+
+    def test_ignored_build_outputs_do_not_change_source_attestation(self):
+        (self.root / '.gitignore').write_text('dist/\nnode_modules/\n')
+        self.commit()
+        calls = []
+        code = 'from pathlib import Path; Path("dist").mkdir(); Path("dist/app.js").write_text("build output")'
+        result = self.call(self.run_args(code), lambda body, token: calls.append(dict(body)))
+        self.assertEqual(result, 0)
+        self.assertEqual(calls[0]['outcome'], 'success')
 
     def test_failed_command_is_reported_as_failure(self):
         calls = []
@@ -170,6 +188,27 @@ class DocumentationTests(unittest.TestCase):
         self.assertEqual(len(calls), 1)
         self.assertEqual(self.call(['replay', record['body']['deployment_id']], lambda *x: calls.append(x)), 0)
         self.assertEqual(len(calls), 1)
+
+    def test_long_unicode_notes_survive_failed_report_and_replay(self):
+        args = self.run_args()
+        args[args.index('--operational-notes') + 1] = 'ü' * 4000
+        def unavailable(body, token):
+            raise ValueError('unavailable')
+        self.assertEqual(self.call(args, unavailable), 3)
+        path = self.receipts()[0]
+        self.assertGreater(path.stat().st_size, 16384)
+        record = json.loads(path.read_text())
+        calls = []
+        self.assertEqual(self.call(['replay', record['body']['deployment_id']], lambda body, token: calls.append(body)), 0)
+        self.assertEqual(calls[0]['operational_notes'], 'ü' * 4000)
+
+    def test_notes_match_nexus_utf16_length_limit(self):
+        args = self.run_args()
+        args[args.index('--operational-notes') + 1] = '😀' * 3000
+        calls = []
+        self.assertEqual(self.call(args, lambda *x: calls.append(x)), 3)
+        self.assertEqual(calls, [])
+        self.assertEqual(self.receipts(), [])
 
     def test_running_receipt_cannot_be_replayed_as_success(self):
         folder = self.root / '.git/nexus-deployment-outbox'

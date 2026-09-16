@@ -121,7 +121,7 @@ def main(argv=None, sender=send_report):
             if not re.fullmatch(r'[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}', args.deployment_id):
                 raise ValueError('Invalid receipt ID')
             path = outbox(root, gate) / (args.deployment_id + '.json')
-            if path.is_symlink() or path.stat().st_size > 16384:
+            if path.is_symlink() or path.stat().st_size > 65536:
                 raise ValueError('Unsafe receipt')
             record = json.loads(path.read_text())
             if record.get('state') == 'accepted':
@@ -136,7 +136,7 @@ def main(argv=None, sender=send_report):
         command = args.command[1:] if args.command[:1] == ['--'] else args.command
         if not command:
             raise ValueError('Deployment command argv is required after --')
-        if not args.operational_notes.strip() or len(args.operational_notes) > 4000:
+        if not args.operational_notes.strip() or len(args.operational_notes.encode('utf-16-le')) // 2 > 4000:
             raise ValueError('Operational notes must contain 1 to 4000 characters')
         validate_evidence(args.evidence_url)
         if gate.git(root, 'status', '--porcelain', '--untracked-files=all'):
@@ -164,10 +164,10 @@ def main(argv=None, sender=send_report):
             exit_code = 130
         except OSError:
             exit_code = 127
-        if gate.git(root, 'rev-parse', 'HEAD') != source_sha or gate.git(root, 'diff', '--name-only', source_sha):
+        if gate.git(root, 'rev-parse', 'HEAD') != source_sha or gate.git(root, 'status', '--porcelain', '--untracked-files=all'):
             # A command that changes checked-out source cannot substantiate this source receipt.
             exit_code = exit_code or 1
-            body['operational_notes'] = ('Source checkout changed during command; exact deployed source requires reconciliation. ' + body['operational_notes'])[:4000]
+            body['operational_notes'] = ('Source checkout changed during command; exact deployed source requires reconciliation. ' + body['operational_notes']).encode('utf-16-le')[:8000].decode('utf-16-le', errors='ignore')
         body['completed_at'] = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
         body['outcome'] = 'success' if exit_code == 0 else 'failure'
         record['state'] = 'pending'
