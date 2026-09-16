@@ -907,3 +907,7 @@ lsof -i :3000
 # Windows:
 netstat -ano | findstr :3000
 ```
+
+## Maintainer documentation
+
+[Project guide: setup, architecture, verification and operations](docs/PROJECT.md) · [Changelogs](changelogs/README.md). The project guide distinguishes implemented behavior from proposals and live deployment evidence.
