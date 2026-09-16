@@ -1,0 +1,38 @@
+name: Documentation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: documentation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  documentation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check shared documentation workflow contracts
+        run: python3 -B -m unittest discover -s scripts -p test_documentation_workflow.py -v
+      - name: Check declared documents and review impact
+        env:
+          DOCUMENTATION_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [ -n "$DOCUMENTATION_BASE" ] && [ "$DOCUMENTATION_BASE" != "0000000000000000000000000000000000000000" ]; then
+            python3 scripts/check-documentation.py --base "$DOCUMENTATION_BASE"
+          else
+            python3 scripts/check-documentation.py
+          fi
