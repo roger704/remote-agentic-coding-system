@@ -1,0 +1,16 @@
+{
+  "name": "project-diagram-validation",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test check.test.mjs"
+  },
+  "dependencies": {
+    "jsdom": "26.1.0",
+    "mermaid": "11.17.2"
+  }
+}

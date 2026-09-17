@@ -4,7 +4,8 @@
     "required": [
       "README.md",
       "docs/PROJECT.md",
-      "docs/deployment-documentation.md"
+      "docs/deployment-documentation.md",
+      "docs/diagrams/README.md"
     ],
     "api": [
       "docs/API.md"

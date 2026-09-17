@@ -23,3 +23,7 @@ Every actual deployment needs a distinct record under [changelogs](../changelogs
 ## Interfaces and further reading
 
 [Fork HTTP API](API.md), [architecture](architecture.md), [cloud deployment](cloud-deployment.md).
+
+## Architecture diagrams
+
+Read [the current architecture and data-flow maps](diagrams/README.md) before planning changes. Proposed behavior is labeled separately from implemented behavior.
