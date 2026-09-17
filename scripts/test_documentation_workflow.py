@@ -75,6 +75,16 @@ class DocumentationTests(unittest.TestCase):
                 gate.check(self.root)
             path.write_text(before)
 
+    def test_enrolled_stale_diagrams_block_deployment_gate(self):
+        path = self.root / 'docs/diagrams'
+        path.mkdir()
+        (path / 'README.md').write_text('# Architecture\n\n```mermaid\nflowchart LR\n A --> B\n```\n\n```mermaid\nflowchart TD\n A --> B\n```\n')
+        (self.root / '.nexus/diagrams.json').write_text(json.dumps({'schema_version': 1, 'documents': ['docs/diagrams/README.md'], 'source_fingerprint': '0' * 64}))
+        with self.assertRaisesRegex(ValueError, 'need source review'):
+            gate.check(self.root)
+        load('check-diagrams').check(self.root, index=True, write=True)
+        self.assertTrue(gate.check(self.root)['diagrams']['ok'])
+
     def test_missing_declared_api_fails(self):
         (self.root / 'docs/API.md').unlink()
         with self.assertRaises(ValueError):

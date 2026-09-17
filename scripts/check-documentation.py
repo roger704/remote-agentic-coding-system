@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Vendored from agent-stack. Structural checks and review signals, not semantic proof."""
 import argparse
+import importlib.util
 import json
 import re
 import subprocess
@@ -93,6 +94,12 @@ def read_config(root):
 
 def check(root, base=None):
     config = read_config(root)
+    diagram_status = None
+    if (root / '.nexus/diagrams.json').exists() or any(name.startswith('docs/diagrams/') for name in config['documentation']['required']):
+        spec = importlib.util.spec_from_file_location('project_diagrams', Path(__file__).with_name('check-diagrams.py'))
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        diagram_status = module.check(root)
     head = git(root, 'rev-parse', 'HEAD')
     if base is not None:
         if not re.fullmatch(r'[a-f0-9]{40}', base):
@@ -106,7 +113,7 @@ def check(root, base=None):
     runtime = [p for p in changes if not doc_path(p) and not p.startswith('changelogs/')]
     api = [p for p in runtime if re.search(r'(^|/)(api|routes?|schemas?|controllers?)(/|\.)|openapi|swagger', p, re.I)]
     migrations = [p for p in runtime if re.search(r'migrat|docker|compose|deploy|requirements|package.*json|\.env', p, re.I)]
-    return {'ok': True, 'source_sha': head, 'comparison_base': base,
+    return {'ok': True, 'diagrams': diagram_status, 'source_sha': head, 'comparison_base': base,
             'required_documents': config['documentation']['required'],
             'api_documents': config['documentation'].get('api', []),
             'documentation_changed': changed_docs[:100],
